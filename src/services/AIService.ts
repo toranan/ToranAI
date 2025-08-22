@@ -76,42 +76,68 @@ export async function parseScheduleFromText(text: string): Promise<Partial<Sched
 // AI API 실패 시 사용할 기본 파싱 함수
 function fallbackParsing(text: string): Partial<Schedule> {
   const now = new Date();
-  const lowerCaseText = text.toLowerCase();
+  const lower = text.toLowerCase();
+
+  const hasScheduleCue = /([0-9]{1,2}\s*월\s*[0-9]{1,2}\s*일)|오늘|내일|모레|내일모레|오전|오후|저녁|밤|정오|점심|([0-9]{1,2}\s*시)/.test(lower);
+  if (!hasScheduleCue) {
+    return { title: text };
+  }
 
   let date = new Date(now);
-  let hours = -1;
+  let hours: number | undefined;
   let minutes = 0;
 
-  // 기본 날짜 파싱
-  if (lowerCaseText.includes('내일')) {
+  if (lower.includes('오늘')) {
+    // today
+  } else if (lower.includes('내일')) {
     date.setDate(now.getDate() + 1);
-  } else if (lowerCaseText.includes('모레')) {
+  } else if (lower.includes('내일모레') || lower.includes('모레')) {
     date.setDate(now.getDate() + 2);
   }
 
-  // 기본 시간 파싱 (예: "오후 3시 30분", "15시")
-  const timeRegex = /(\d{1,2})시(?:\s*(\d{1,2})분)?/;
-  const timeMatch = lowerCaseText.match(timeRegex);
+  const mdMatch = lower.match(/([0-9]{1,2})\s*월\s*([0-9]{1,2})\s*일/);
+  if (mdMatch) {
+    const month = parseInt(mdMatch[1], 10) - 1;
+    const day = parseInt(mdMatch[2], 10);
+    const year = now.getFullYear();
+    const candidate = new Date(year, month, day, 0, 0, 0, 0);
+    if (candidate.getTime() < now.getTime()) {
+      candidate.setFullYear(year + 1);
+    }
+    date = candidate;
+  }
 
+  const timeRegex = /(?:(오전|오후|저녁|밤|정오|점심)\s*)?(\d{1,2})?\s*시(?:\s*(\d{1,2})\s*분)?/;
+  const timeMatch = lower.match(timeRegex);
   if (timeMatch) {
-    hours = parseInt(timeMatch[1], 10);
-    minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+    const meridiem = timeMatch[1];
+    const hourNum = timeMatch[2] ? parseInt(timeMatch[2], 10) : undefined;
+    minutes = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
 
-    if (lowerCaseText.includes('오후') && hours < 12) {
-      hours += 12;
+    if (hourNum !== undefined) {
+      hours = hourNum;
+      if (meridiem === '오후' || meridiem === '저녁' || meridiem === '밤') {
+        if (hours < 12) hours += 12;
+      }
+      if (meridiem === '정오' || meridiem === '점심') {
+        hours = 12;
+      }
+    } else if (meridiem) {
+      if (meridiem === '오전') hours = 9;
+      if (meridiem === '오후' || meridiem === '저녁' || meridiem === '밤') hours = 18;
+      if (meridiem === '정오' || meridiem === '점심') hours = 12;
     }
   }
 
-  if (hours !== -1) {
-    date.setHours(hours, minutes, 0, 0);
-  } else {
-    // 시간이 명시되지 않으면 적절한 기본 시간 설정
-    date.setHours(9, 0, 0, 0); // 오전 9시 기본
+  if (hours === undefined) {
+    hours = 9;
   }
+
+  date.setHours(hours, minutes, 0, 0);
 
   return {
     title: text,
-    date: date,
+    date,
   };
 }
 
