@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Schedule } from '../types';
 
@@ -30,35 +30,6 @@ export default function ScheduleScreen() {
     }
   };
 
-  const saveSchedules = async (newSchedules: Schedule[]) => {
-    try {
-      const jsonValue = JSON.stringify(newSchedules);
-      await AsyncStorage.setItem(SCHEDULE_STORAGE_KEY, jsonValue);
-      setSchedules(newSchedules);
-    } catch (e) {
-      console.error("Failed to save schedules.", e);
-    }
-  };
-
-  const deleteSchedule = (scheduleId: string) => {
-    Alert.alert(
-      "일정 삭제",
-      "이 일정을 삭제하시겠습니까?",
-      [
-        { text: "취소", style: "cancel" },
-        { 
-          text: "삭제", 
-          style: "destructive",
-          onPress: () => {
-            const updatedSchedules = schedules.filter(s => s.id !== scheduleId);
-            saveSchedules(updatedSchedules);
-          }
-        }
-      ]
-    );
-  };
-
-  // 컴포넌트가 마운트될 때 일정 로드
   useEffect(() => {
     loadSchedules();
   }, []);
@@ -86,20 +57,19 @@ export default function ScheduleScreen() {
     const diffTime = date.getTime() - now.getTime();
     
     if (diffTime < 0) {
-      return '#999'; // 지난 일정 - 회색
+      return '#999';
     } else if (diffTime < 24 * 60 * 60 * 1000) {
-      return '#ff6b6b'; // 오늘 일정 - 빨간색
+      return '#ff6b6b';
     } else if (diffTime < 7 * 24 * 60 * 60 * 1000) {
-      return '#ffa726'; // 일주일 내 - 주황색
+      return '#ffa726';
     } else {
-      return '#66bb6a'; // 미래 일정 - 초록색
+      return '#66bb6a';
     }
   };
 
   const renderScheduleItem = ({ item }: { item: Schedule }) => (
-    <TouchableOpacity 
+    <View 
       style={[styles.scheduleItem, { borderLeftColor: getStatusColor(item.date) }]}
-      onLongPress={() => deleteSchedule(item.id)}
     >
       <View style={styles.scheduleContent}>
         <Text style={styles.scheduleTitle}>{item.title}</Text>
@@ -109,7 +79,7 @@ export default function ScheduleScreen() {
         )}
       </View>
       <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(item.date) }]} />
-    </TouchableOpacity>
+    </View>
   );
 
   if (loading) {

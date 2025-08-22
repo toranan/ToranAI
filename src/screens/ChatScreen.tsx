@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseScheduleFromText, chatWithAI } from '../services/AIService';
 import { schedulePushNotification } from '../services/NotificationService';
 import { Schedule } from '../types';
+import { ENV_STATUS } from '../utils/config';
 
 const SCHEDULE_STORAGE_KEY = 'schedules';
 
@@ -18,12 +19,18 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '안녕하세요! 저는 여러분의 AI 어시스턴트입니다. 😊\n\n일정을 추가하고 싶으시면 자연스럽게 말씀해 주세요!\n예: "내일 오후 3시에 팀 회의", "다음 주 금요일 저녁 7시에 친구와 저녁식사"\n\n그 외에도 궁금한 것이 있으면 언제든 물어보세요!',
+      text: '안녕하세요? 사용자님의 개인 AI비서 토란입니다! 원하시는 명령을 해주세요!',
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [inputText, setInputText] = useState('');
+
+  useEffect(() => {
+    if (!ENV_STATUS.GEMINI_CONFIGURED) {
+      addMessage('환경설정 안내: .env 파일에 GEMINI_API_KEY를 설정하시면 AI 대화가 활성화됩니다.', false);
+    }
+  }, []);
 
   const loadSchedules = async (): Promise<Schedule[]> => {
     try {
@@ -63,17 +70,14 @@ export default function ChatScreen() {
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
 
-    // 사용자 메시지 추가
     addMessage(inputText, true);
     const userInput = inputText;
     setInputText('');
 
     try {
-      // 먼저 일정 파싱 시도
       const parsedSchedule = await parseScheduleFromText(userInput);
 
       if (parsedSchedule.date) {
-        // 일정이 성공적으로 파싱된 경우
         const currentSchedules = await loadSchedules();
         const newSchedule: Schedule = {
           id: Date.now().toString(),
@@ -87,11 +91,10 @@ export default function ChatScreen() {
         await schedulePushNotification(newSchedule);
 
         addMessage(
-          `일정이 추가되었습니다! 📅\n\n� ${newSchedule.title}\n⏰ ${newSchedule.date.toLocaleString()}\n${newSchedule.location ? `📍 ${newSchedule.location}` : ''}`,
+          `일정이 추가되었습니다! 📅\n\n• ${newSchedule.title}\n⏰ ${newSchedule.date.toLocaleString()}\n${newSchedule.location ? `📍 ${newSchedule.location}` : ''}`,
           false
         );
       } else {
-        // 일정이 아닌 일반 대화로 인식된 경우
         const aiResponse = await chatWithAI(userInput);
         addMessage(aiResponse, false);
       }

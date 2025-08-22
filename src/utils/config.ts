@@ -12,6 +12,10 @@ export const API_CONFIG = {
   },
 };
 
+export const ENV_STATUS = {
+  GEMINI_CONFIGURED: Boolean(GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key'),
+};
+
 export const APP_CONFIG = {
   DEFAULT_LOCATION: {
     latitude: 37.5665,
