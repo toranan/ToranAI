@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList } from 'react-native';
+import { StyleSheet, Text, View, FlatList, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Schedule } from '../types';
 
@@ -8,6 +8,7 @@ const SCHEDULE_STORAGE_KEY = 'schedules';
 export default function ScheduleScreen() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadSchedules = async () => {
     try {
@@ -32,7 +33,20 @@ export default function ScheduleScreen() {
 
   useEffect(() => {
     loadSchedules();
+    
+    // 주기적으로 일정을 다시 로드 (5초마다)
+    const interval = setInterval(() => {
+      loadSchedules();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadSchedules();
+    setRefreshing(false);
+  };
 
   const formatDate = (date: Date) => {
     const now = new Date();
@@ -117,6 +131,14 @@ export default function ScheduleScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#6c5ce7']}
+              tintColor="#6c5ce7"
+            />
+          }
         />
       )}
     </View>

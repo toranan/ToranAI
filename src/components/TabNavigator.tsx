@@ -1,21 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ChatScreen from '../screens/ChatScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
+import { Message } from '../types';
 
 type TabType = 'chat' | 'schedule';
 
+const MESSAGES_STORAGE_KEY = 'chat_messages';
+
 export default function TabNavigator() {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const loadMessages = async () => {
+    try {
+      const storedMessages = await AsyncStorage.getItem(MESSAGES_STORAGE_KEY);
+      if (storedMessages) {
+        const parsedMessages = JSON.parse(storedMessages).map((msg: Message) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        }));
+        setMessages(parsedMessages);
+      } else {
+        const initialMessage: Message = {
+          id: '1',
+          text: '안녕하세요? 사용자님의 개인 AI비서 토란입니다! 원하시는 명령을 해주세요!',
+          isUser: false,
+          timestamp: new Date(),
+        };
+        setMessages([initialMessage]);
+      }
+    } catch (error) {
+      console.error('메시지 로딩 오류:', error);
+      const initialMessage: Message = {
+        id: '1',
+        text: '안녕하세요? 사용자님의 개인 AI비서 토란입니다! 원하시는 명령을 해주세요!',
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setMessages([initialMessage]);
+    }
+  };
+
+  const saveMessages = async (newMessages: Message[]) => {
+    try {
+      const jsonValue = JSON.stringify(newMessages);
+      await AsyncStorage.setItem(MESSAGES_STORAGE_KEY, jsonValue);
+    } catch (error) {
+      console.error('메시지 저장 오류:', error);
+    }
+  };
+
+  const handleMessagesUpdate = (newMessages: Message[] | ((prev: Message[]) => Message[])) => {
+    let messagesToSave: Message[];
+    
+    if (typeof newMessages === 'function') {
+      setMessages(prev => {
+        const result = newMessages(prev);
+        messagesToSave = result;
+        saveMessages(result);
+        return result;
+      });
+    } else {
+      messagesToSave = newMessages;
+      setMessages(newMessages);
+      saveMessages(newMessages);
+    }
+  };
+
+  const resetChat = async () => {
+    try {
+      await AsyncStorage.removeItem(MESSAGES_STORAGE_KEY);
+      const initialMessage: Message = {
+        id: Date.now().toString(),
+        text: '안녕하세요? 사용자님의 개인 AI비서 토란입니다! 원하시는 명령을 해주세요!',
+        isUser: false,
+        timestamp: new Date(),
+      };
+      const newMessages = [initialMessage];
+      setMessages(newMessages);
+      await saveMessages(newMessages);
+    } catch (error) {
+      console.error('채팅 리셋 오류:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadMessages();
+  }, []);
 
   const renderScreen = () => {
     switch (activeTab) {
       case 'chat':
-        return <ChatScreen />;
+        return <ChatScreen messages={messages} setMessages={handleMessagesUpdate} resetChat={resetChat} />;
       case 'schedule':
         return <ScheduleScreen />;
       default:
-        return <ChatScreen />;
+        return <ChatScreen messages={messages} setMessages={handleMessagesUpdate} resetChat={resetChat} />;
     }
   };
 
